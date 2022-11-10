@@ -139,7 +139,14 @@ class Game {
   async shuffleDeck() {
     const shuffleDeckCards = new pgp.PreparedStatement({
       name: "shuffle-deck-cards",
-      text: "WITH shuffled AS (SELECT card_id, ROW_NUMBER() OVER(ORDER BY RANDOM()) - 1 AS new_order FROM game_cards WHERE game_id = $1 AND location = 'DECK') UPDATE game_cards SET \"order\" = new_order FROM shuffled WHERE game_id = $1 AND location = 'DECK' AND game_cards.card_id = shuffled.card_id",
+      text: `
+        WITH shuffled AS
+          (SELECT card_id, ROW_NUMBER() OVER(ORDER BY RANDOM()) - 1 AS new_order
+            FROM game_cards
+            WHERE game_id = $1 AND location = 'DECK')
+        UPDATE game_cards
+          SET \"order\" = new_order FROM shuffled
+          WHERE game_id = $1 AND location = 'DECK' AND game_cards.card_id = shuffled.card_id`,
     });
     await db.none(shuffleDeckCards, [
       this.id,
