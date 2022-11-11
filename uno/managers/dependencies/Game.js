@@ -17,17 +17,7 @@ class Game {
 
     socket.emit("game_state", await this.getGameStateForUser(socket.request.session.passport.user.user_id));
 
-    this.emitSystemMessage(`"${socket.request.session.passport.user.username}" has joined the game.`);
-  }
-
-  /**
-   * Emits sanitized game states (cards that the user shouldn't see are hidden) to all connected sockets.
-   */
-  async emitGameStatesToConnectedSockets() {
-    const sanitizedUserGameStates = await this.getGameStatesForConnectedUsers();
-    for (const socketId in this.connectedSockets) {
-      this.connectedSockets[socketId].emit("game_state", sanitizedUserGameStates[this.connectedSockets[socketId].request.session.passport.user.user_id]);
-    }
+    this.emitGameEvent({ type: "PLAYER_JOINED", username: socket.request.session.passport.user.username });
   }
 
   /**
@@ -101,29 +91,16 @@ class Game {
    */
   async getGameState() {
     // Retrieve game data from DB
-    const getGame = new pgp.PreparedStatement({
+    const game = await db.one(new pgp.PreparedStatement({
       name: "get-game",
       text: "SELECT started, ended FROM games WHERE game_id = $1",
-    });
-    const game = await db.one(getGame, [
+    }), [
       this.id,
     ]);
 
-    const getGameUsers = new pgp.PreparedStatement({
-      name: "get-game-users",
-      text: "SELECT user_id, username, play_order, state, is_host FROM game_users INNER JOIN users USING(user_id) WHERE game_id = $1",
-    });
-    const gameUsers = await db.manyOrNone(getGameUsers, [
-      this.id,
-    ]);
+    const gameUsers = await this.getGameUsers();
 
-    const getGameCards = new pgp.PreparedStatement({
-      name: "get-game-cards",
-      text: "SELECT card_id, color, \"value\", location, \"order\", user_id FROM game_cards INNER JOIN cards USING(card_id) WHERE game_id = $1",
-    });
-    const gameCards = await db.manyOrNone(getGameCards, [
-      this.id,
-    ]);
+    const gameCards = await this.getGameCards();
 
     // Construct game state from retrieved data
     const gameState = {
@@ -136,35 +113,151 @@ class Game {
     return gameState;
   }
 
-  async shuffleDeck() {
-    const shuffleDeckCards = new pgp.PreparedStatement({
-      name: "shuffle-deck-cards",
+  async getGameUsers(transaction) {
+    const gameUsers = await (transaction ?? db).manyOrNone(new pgp.PreparedStatement({
+      name: "get-game-users",
       text: `
-        WITH shuffled AS
-          (SELECT card_id, ROW_NUMBER() OVER(ORDER BY RANDOM()) - 1 AS new_order
-            FROM game_cards
-            WHERE game_id = $1 AND location = 'DECK')
-        UPDATE game_cards
-          SET \"order\" = new_order FROM shuffled
-          WHERE game_id = $1 AND location = 'DECK' AND game_cards.card_id = shuffled.card_id`,
-    });
-    await db.none(shuffleDeckCards, [
+        SELECT user_id, username, play_order, state, is_host
+          FROM game_users
+          INNER JOIN users USING(user_id)
+          WHERE game_id = $1`,
+    }), [
       this.id,
     ]);
+    return gameUsers;
+  }
+
+  async getGameCards(transaction) {
+    const gameCards = await (transaction ?? db).manyOrNone(new pgp.PreparedStatement({
+      name: "get-game-cards",
+      text: `
+        SELECT card_id, color, \"value\", location, \"order\", user_id
+          FROM game_cards
+          INNER JOIN cards USING(card_id)
+          WHERE game_id = $1`,
+    }), [
+      this.id,
+    ]);
+    return gameCards;
+  }
+
+  async getDeckCards(transaction) {
+    const deckCards = await (transaction ?? db).manyOrNone(new pgp.PreparedStatement({
+      name: "get-deck-cards",
+      text: `
+        SELECT card_id, color, \"value\", location, \"order\", user_id
+          FROM game_cards
+          INNER JOIN cards USING(card_id)
+          WHERE game_id = $1 AND location = 'DECK'`,
+    }), [
+      this.id,
+    ]);
+    return deckCards;
+  }
+
+  async getUserHandCards(userId, transaction) {
+    const deckCards = await (transaction ?? db).manyOrNone(new pgp.PreparedStatement({
+      name: "get-user-hand-cards",
+      text: `
+        SELECT card_id, color, \"value\", location, \"order\", user_id
+          FROM game_cards
+          INNER JOIN cards USING(card_id)
+          WHERE game_id = $1 AND user_id = $2 AND location = 'HAND'`,
+    }), [
+      this.id,
+      userId,
+    ]);
+    return deckCards;
+  }
+
+  async shuffleDeck(transaction) {
+    const deckCards = await this.getDeckCards(transaction);
+    // Generate an array of consecutive numbers 0 ... deckCards.length
+    const newCardOrders = [...Array(deckCards.length).keys()];
+    // Durstenfeld shuffle in-place
+    for (let i = newCardOrders.length - 1; i > 0; i--) {
+      const rand = Math.floor(Math.random() * (i + 1));
+      [newCardOrders[i], newCardOrders[rand]] = [newCardOrders[rand], newCardOrders[i]];
+    }
+    // Update cards in DB
+    await (transaction ?? db).none(`
+        UPDATE game_cards
+          SET "order" = temp."order"
+          FROM (VALUES $2:raw) AS temp(card_id, "order")
+          WHERE game_id = $1 AND game_cards.card_id = temp.card_id`, [
+      this.id,
+      require("pg-promise")().helpers.values(newCardOrders.map((newCardOrder, i) => {
+        return {
+          card_id: deckCards[i].card_id,
+          order: newCardOrder,
+        };
+      }), ["card_id", "order"]),
+    ]);
+    this.emitGameEvent({ type: "DECK_SHUFFLED" });
+  }
+
+  async mergeDiscardIntoDeckIfDeckEmpty(transaction) {
+    // If deck is empty
+    if (await (transaction ?? db).one(new pgp.PreparedStatement({
+      name: "get-deck-card-count",
+      text: `SELECT COUNT(*) FROM game_cards WHERE game_id = $1 AND location = 'DECK'`,
+    }), [this.id]) === 0) {
+      // Merge discard into deck
+      await (transaction ?? db).none(new pgp.PreparedStatement({
+        name: "merge-discard-into-deck",
+        text: `UPDATE game_cards SET location = 'DECK' WHERE game_id = $1 AND location = 'DISCARD'`,
+      }), [this.id]);
+      // Shuffle deck
+      await this.shuffleDeck(transaction);
+    }
+  }
+
+  async dealCard(userId) {
+    await db.tx(async t => {
+      await this.mergeDiscardIntoDeckIfDeckEmpty(t);
+
+      await t.none(new pgp.PreparedStatement({
+        name: "deal-card",
+        text: `
+          UPDATE game_cards
+            SET
+              location = 'HAND',
+              user_id = $2,
+              "order" = 1 + COALESCE(
+                (SELECT MAX("order") FROM game_cards WHERE game_id = $1 AND user_id = $2 AND location = 'HAND'), -1
+              )
+            WHERE
+              game_id = $1 AND
+              location = 'DECK' AND
+              "order" = (
+                SELECT MAX("order") FROM game_cards WHERE game_id = $1 AND location = 'DECK'
+              )`,
+      }), [
+        this.id,
+        userId,
+      ]);
+    });
   }
 
   /**
-   * Emits a chat message event to all connected sockets.
+   * Emits sanitized game states (cards that the user shouldn't see are hidden) to all connected sockets.
    */
+  async emitGameStates() {
+    const sanitizedUserGameStates = await this.getGameStatesForConnectedUsers();
+    for (const socketId in this.connectedSockets) {
+      this.connectedSockets[socketId].emit("game_state", sanitizedUserGameStates[this.connectedSockets[socketId].request.session.passport.user.user_id]);
+    }
+  }
+
   emitChatMessage(username, message) {
     for (const socketId in this.connectedSockets) {
       this.connectedSockets[socketId].emit("chat_message", { username: username, message: message });
     }
   }
 
-  emitSystemMessage(message) {
+  emitGameEvent(event) {
     for (const socketId in this.connectedSockets) {
-      this.connectedSockets[socketId].emit("system_message", { message: message });
+      this.connectedSockets[socketId].emit("game_event", event);
     }
   }
 }
