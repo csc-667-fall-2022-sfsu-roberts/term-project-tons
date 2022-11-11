@@ -215,7 +215,6 @@ class Game {
   async dealCard(userId) {
     await db.tx(async t => {
       await this.mergeDiscardIntoDeckIfDeckEmpty(t);
-
       await t.none(new pgp.PreparedStatement({
         name: "deal-card",
         text: `
