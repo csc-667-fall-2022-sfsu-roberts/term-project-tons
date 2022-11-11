@@ -32,6 +32,7 @@ router.post("/", passport.session(), async (req, res, next) => {
 /**
  * POST /api/games/:gameId/chat
  * 
+ * Request body must be a JSON object containing the keys "message".
  * Sends a chat message to a game.
  */
 router.post("/:gameId/chat", passport.session(), async (req, res, next) => {
