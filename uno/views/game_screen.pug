@@ -19,21 +19,15 @@ script(src='/socket.io/socket.io.js')
     .youDidNotSayUnoButtonContainer
         button.youDidNotSayUnoButton(type="button") You didn't say Uno!
     #myHand.hand
-    #opNameLeft.opponentName Sophia
-    #leftOpponent.hand
-        .card.leftOpponentCard
-        .card.leftOpponentCard
-        .card.leftOpponentCard
-    #opNameTop.opponentName Troy
-    #topOpponent.hand
-        .card.topOpponentCard
-        .card.topOpponentCard
-        .card.topOpponentCard
-    #opNameRight.opponentName Olivier
-    #rightOpponent.hand
-        .card.rightOpponentCard
-        .card.rightOpponentCard
-        .card.rightOpponentCard
+    .leftOpponentContainer
+        #leftOpponentName.opponentName Sophia
+        #leftOpponent
+    .topOpponentContainer
+        #topOpponentName.opponentName Troy
+        #topOpponent
+    .rightOpponentContainer
+        #rightOpponentName.opponentName Olivier
+        #rightOpponent
     .wildcardButtonContainer
     .container-chat
         .accordion-content

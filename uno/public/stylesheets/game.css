@@ -146,6 +146,13 @@ table {
 * END CSS RESET
 **/
 
+:root{
+    --numCards: 0;
+    --leftOpponentCards: 0;
+    --rightOpponentCards: 0;
+    --topOpponentCards: 0;
+}
+
 html {
     --distance: 1rem;
 }
@@ -377,61 +384,81 @@ body {
     position: absolute;
 }
 
-#opNameLeft,
-#opNameRight {
-    height: 50vh;
+.leftOpponentContainer,
+.rightOpponentContainer{
+    display: flex;
+    position: fixed;
     top: 50vh;
     margin-top: -30vh;
+    height: 60vh;
+    width: 21vh;
 }
-
-#opNameLeft {
+.leftOpponentContainer{
+    left:0px;
+}
+.rightOpponentContainer{
     right: 0px;
 }
-
-#opNameRight{
-    left: 0px;
-}
-
-#opNameTop {
-    top: 0px;
+.topOpponentContainer{
+    position: fixed;
     left: 50%;
-    margin-left: -20%;
+    margin-left: -15%;
+    width: 60vh;
+    height: 21vh;
+    top: 0px;
 }
 
+#leftOpponentName,
+#rightOpponentName {
+    transform: translateY(-100%);
+}
+#rightOpponentName{
+    right: 0px;
+}
+#topOpponentName {
+    top: 0px;
+    transform: translateX(-105%);
+} */
+
+#leftOpponentName,
+#rightOpponentName,
+#topOpponentName,
+#leftOpponent,
+#rightOpponent,
+#topOpponent{
+    visibility: hidden;
+}
 
 #leftOpponent,
 #rightOpponent {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     border: .2rem solid yellow;
     border-radius: 1rem;
     width: 21vh;
-    height: 50vh;
-    top: 50vh;
-    margin-top: -25vh;
-    flex-direction: column;
 }
 
 #leftOpponent {
-    left: 0px;
     border-left: 0px;
     border-top-left-radius: 0%;
     border-bottom-left-radius: 0%;
 }
 
 #topOpponent {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
     border: .2rem solid yellow;
     border-top: 0px;
     border-radius: 1rem;
     border-top-left-radius: 0%;
     border-top-right-radius: 0%;
-    left: 50%;
-    margin-left: -15%;
-    width: 30%;
     height: 21vh;
     top: 0px;
 }
 
 #rightOpponent {
-    right: 0px;
     border-right: 0px;
     border-top-right-radius: 0%;
     border-bottom-right-radius: 0%;
@@ -463,7 +490,6 @@ body {
 
 .dealCard {
     position: absolute;
-    background-color: green;
     z-index: 3;
 }
 
@@ -499,7 +525,7 @@ body {
 }
 
 .myCard:not(:first-child) {
-    margin-left: calc(21*-.5vh);
+    margin-left: calc(var(--numCards)*-.5vh);
 }
 
 .myCard:hover,
@@ -509,7 +535,7 @@ body {
 
 .myCard:hover~.myCard,
 .myCard:focus-within~.myCard {
-    transform: translatex(calc(21*.5vh));
+    transform: translatex(calc(var(--numCards)*.5vh));
 }
 
 .myCard:hover {
@@ -527,13 +553,15 @@ body {
     filter: brightness(85%);
 }
 
-.rightOpponentCard:not(:first-child),
+.rightOpponentCard:not(:first-child){
+    margin-top: calc(var(--rightOpponentCards)*-2vh);
+}
 .leftOpponentCard:not(:first-child) {
-    margin-top: calc(3*-3vh);
+    margin-top: calc(var(--leftOpponentCards)*-2vh);
 }
 
 .topOpponentCard:not(:last-child) {
-    margin-right: calc(3*-1vh);
+    margin-right: calc(var(--topOpponentCards)*-1vh);
 }
 
 /* CHAT */
