@@ -177,7 +177,6 @@ router.post("/:gameId/play-card", passport.session(), async (req, res, next) => 
     });
     const validated = await schema.validateAsync(req.body);
 
-    console.log(validated.chosen_wildcard_color)
     // Retrieve game instance
     const game = await GameManager.getGameByGameId(req.params.gameId);
     if (!game) {

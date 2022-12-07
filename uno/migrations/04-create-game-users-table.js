@@ -26,6 +26,10 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
       },
+      seat_order: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
       state: {
         type: Sequelize.ENUM("PLAYING", "WON", "LOST"),
         allowNull: false,

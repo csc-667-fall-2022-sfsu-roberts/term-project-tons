@@ -69,6 +69,11 @@ const gamePlayers = {
   rightOpponent: '',
 };
 
+let discardPileDegree = [];
+for (let i = 0; i < 108; i++) {
+    discardPileDegree.push(Math.floor(Math.random() * 20) * (Math.round(Math.random()) ? 1 : -1));
+}
+
 let currentUser;
 fetch('/api/users/current').then((response) => {
   if (response.status == 200) {
@@ -81,72 +86,93 @@ fetch('/api/users/current').then((response) => {
   }
 });
 
-socket.on('game_state', (gameState) => {
-  console.log(gameState);
 
-  const deleteAssets = document.getElementById('myHand');
+socket.on("game_state", (gameState) => {
+    console.log(gameState)
+    //small issue with play order, if the player refreshes then the
+    const currentOpponents = gameState?.users.filter(opponent => {
+        return opponent.user_id !== currentUser.user_id;
+    }).sort((a, b) => a.play_order - b.play_order);
 
-  while (deleteAssets.firstChild) {
-    deleteAssets.removeChild(deleteAssets.firstChild);
-  }
-  const currentUserCards = gameState?.cards
-    .filter((card) => {
-      return card.location === 'HAND' && card.user_id === currentUser.user_id;
-    })
-    .sort((a, b) => a.order - b.order);
-  for (const card of currentUserCards) {
-    // dealCard(CARD_FILE[card.color][card.value]); -- change by troy
-    dealCard(card);
-  }
-
-  const discardPile = gameState?.cards.filter((card) => {
-    return card.location === 'DISCARD';
-  });
-
-  let topCard = discardPile[0];
-  for (const card of discardPile) {
-    if (topCard.order < card.order) {
-      topCard = card;
+    for (let opponent of currentOpponents) {
+        if (!gamePlayers[opponent]) {
+            Object.keys(gamePlayers).forEach(key => {
+                if (gamePlayers[key] === "") {
+                    gamePlayers[key] = opponent;
+                }
+            });
+        }
     }
-  }
 
-  discardPileCard(topCard);
+
+    const deleteAssets = document.getElementById("myHand")
+
+    while (deleteAssets.firstChild) {
+        deleteAssets.removeChild(deleteAssets.firstChild);
+    }
+    const currentUserCards = gameState?.cards.filter(card => {
+        return card.user_id === currentUser.user_id;
+    }).sort((a, b) => a.order - b.order);
+    for (const card of currentUserCards) {
+        // dealCard(CARD_FILE[card.color][card.value]); -- change by troy
+        dealCard(card)
+    }
+
+    Object.keys(gamePlayers).forEach(key => {
+        if (gamePlayers[key] !== "") {
+            const currentOpponentCards = gameState?.cards.filter(card => {
+                return card.user_id === gamePlayers[key];
+            })
+            for (const card of currentOpponentCards) {
+                dealOpponentCard(Object.keys(gamePlayers).find(key => object[key] === value));
+            }
+        }
+    });
+
+    const discardPile = gameState?.cards.filter(card => {
+        return card.location === "DISCARD"
+    }).sort((a, b) => a.order - b.order);
+
+    discardPileCard(discardPile);
+
+
+
 });
 
 socket.on('game_event', (gameEvent) => {
-  console.log(gameEvent);
-  switch (gameEvent.type) {
-    //Additional keys: user_id
-    case 'PLAYER_JOINED':
-      break;
-    //Additional keys: user_id
-    case 'PLAYER_LEFT':
-    case 'PLAYER_FORFEIT':
-      break;
-    case 'DECK_SHUFFLED':
-      replenishDeck();
-      break;
-    //Additional keys: user_id
-    case 'DEALT_CARD':
-      dealOpponentCard(user_id);
-      break;
-    case 'GAME_DELETED':
-      //?? what do we display here
-      // TODO: display message "the host has ended the game", redirect to lobby
-      break;
-    case 'GAME_STARTED':
-      //TODO
-      //make
-      break;
-    case 'GAME_ENDED':
-      break;
-    case 'CARD_PLAYED':
-      discardPileCard(gameEvent);
-      break;
-    default:
-      console.log('Unrecognized ');
-  }
-});
+    console.log(gameEvent)
+    switch (gameEvent.type) {
+        //Additional keys: user_id
+        case "PLAYER_JOINED":
+            break;
+        //Additional keys: user_id
+        case "PLAYER_LEFT":
+            break;
+        case "PLAYER_FORFEIT":
+            break;
+        case "DECK_SHUFFLED":
+            replenishDeck();
+            break;
+        //Additional keys: user_id
+        case "DEALT_CARD":
+            visualizeDealtCard(gameEvent?.user_id);
+            break;
+        case "GAME_DELETED":
+            //?? what do we display here
+            // TODO: display message "the host has ended the game", redirect to lobby
+            break;
+        case "GAME_STARTED":
+            //TODO
+            //make 
+            break;
+        case "GAME_ENDED":
+            break;
+        case "CARD_PLAYED":
+            break;
+        default:
+            console.log("Unrecognized ")
+    }
+})
 
 //TODO
 //direction of play matters
@@ -211,8 +237,7 @@ function takeAndDeal() {
  */
 
 function dealCard(card) {
-  //TODO
-  //Get top card of database deck and assign specific card background
+
   let elem = document.getElementById('myHand');
   let newCard = document.createElement('div');
   newCard.classList.add('card', 'myCard');
@@ -259,7 +284,6 @@ function dealOpponentCard(user_id) {
 
 //TODO
 //add timeout to play another card
-//NEEDS TO BE ABLE TO HANDLE chosen_wildcard_color
 function playCard(elem, color) {
   //TODO
   const num = parseInt(elem.id);
@@ -326,24 +350,6 @@ function wildcard(card) {
   });
 }
 
-function POSTCard() {
-  var card = {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-    body: JSON.stringify({
-      message: input.value,
-    }),
-  };
-  fetch('/api/global-chat', message);
-
-  input.value = '';
-  input.focus();
-}
-
 /**
  *             | |
  *             | |
@@ -352,22 +358,24 @@ function POSTCard() {
  *              ∨
  */
 
-function discardPileCard(card) {
-  let elem = document.getElementsByClassName('card discardCard').item(0);
-  console.log(elem);
-  let randomDegree =
-    Math.floor(Math.random() * 20) * (Math.round(Math.random()) ? 1 : -1);
-  console.log(randomDegree);
-  elem.style.backgroundImage = 'url(' + CARD_FILE[card.color][card.value] + ')';
-  elem.animate(
-    [
-      { transform: 'rotate(calc(' + randomDegree + 'deg' + ')) scale(1.5)' },
-      { transform: 'rotate(calc(' + randomDegree + 'deg' + ')) scale(1)' },
-    ],
-    {
-      duration: 300,
-      iterations: 1,
+function discardPileCard(discardPile) {
+    let degreeTracker = 0;
+    for (const card of discardPile) {
+        let elem = document.getElementsByClassName("discard").item(0);
+        let newCard = document.createElement("div");
+        elem.appendChild(newCard);
+        newCard.classList.add("card", "discardCard");
+        newCard.style.backgroundImage = "url(" + CARD_FILE[card.color][card.value] + ")";
+        newCard.style.transform = 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + '))'
+        degreeTracker++;
     }
-  );
-  elem.style.transform = 'rotate(calc(' + randomDegree + 'deg' + '))';
+    let lastCard = document.getElementsByClassName("discard").item(0).lastChild;
+    lastCard.animate([
+        { transform: 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + ')) scale(1.5)' },
+        { transform: 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + ')) scale(1)' }
+    ], {
+        duration: 300,
+        iterations: 1
+    })
+    lastCard.style.transform = 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + '))'
 }

@@ -63,27 +63,19 @@ class Game {
    * Returns a game state where cards that the given user should not be able to see (other player's cards, the deck, etc.) are hidden.
    */
   sanitizeGameStateForUser(gameState, userId) {
-    // TODO: Don't sanitize cards if game has ended
+    // If game has ended, reveal all cards to the user
+    if (gameState.ended) {
+      return gameState;
+    }
+    // If game hasn't ended, some cards should be hidden from the user
     const {
       cards,
       ...restOfGameState
     } = gameState;
-    const largestOrderInDiscardPile = cards
-      .filter(card => card.location === "DISCARD")
-      .reduce((largestOrder, currentCard) => {
-        if (!largestOrder || currentCard.order > largestOrder) {
-          return currentCard.order;
-        } else {
-          return largestOrder;
-        }
-      }, null);
     const sanitizedGameState = {
       cards: cards.map(card => {
-        // The user can only see their own cards, and the top card of the discard pile.
-        if (card.user_id === userId) {
-          return card;
-        }
-        if (card.location === "DISCARD" && card.order === largestOrderInDiscardPile) {
+        // The user can only see their own cards, and the discard pile.
+        if (card.user_id === userId || card.location === "DISCARD") {
           return card;
         }
         // Otherwise, the card's card_id (color and value can be determined from card_id), color, and value should be hidden to the user.
@@ -115,6 +107,7 @@ class Game {
       const gameState = {
         started: game.started,
         ended: game.ended,
+        chosen_wildcard_color: game.chosen_wildcard_color,
         users: gameUsers,
         cards: gameCards,
       };
@@ -124,7 +117,7 @@ class Game {
   }
 
   async getGame(transaction) {
-    const game = await (transaction ?? db).one("SELECT started, ended FROM games WHERE game_id = $1", [
+    const game = await (transaction ?? db).one("SELECT started, ended, chosen_wildcard_color FROM games WHERE game_id = $1", [
       this.id,
     ]);
     return game;
@@ -132,7 +125,7 @@ class Game {
 
   async getGameUsers(transaction) {
     const gameUsers = await (transaction ?? db).manyOrNone(`
-      SELECT user_id, play_order, state, is_host
+      SELECT user_id, username, play_order, seat_order, state, is_host
         FROM game_users
         INNER JOIN users USING(user_id)
         WHERE game_id = $1`, [
@@ -217,10 +210,10 @@ class Game {
   }
 
   async getChosenWildcardColor(transaction) {
-    await (transaction ?? db).one(`
+    return (await (transaction ?? db).one(`
       SELECT chosen_wildcard_color FROM games WHERE game_id = $1`, [
       this.id,
-    ]);
+    ])).chosen_wildcard_color;
   }
 
   async isGameInProgress(transaction) {
@@ -349,14 +342,28 @@ class Game {
         gameUsers[i].play_order = (randomOrder + i) % gameUsers.length;
       }
       await Promise.all(gameUsers.map(gameUser => {
-        return t.none(`UPDATE game_users SET play_order = $3 WHERE game_id = $1 AND user_id = $2`, [
+        return t.none(`UPDATE game_users SET play_order = $3, seat_order = $3 WHERE game_id = $1 AND user_id = $2`, [
           this.id,
           gameUser.user_id,
           gameUser.play_order,
         ]);
       }));
-      // Deal card from deck onto discard
-      // TODO: Redeal card if dealt card is draw 4
+      // Reshuffle deck until top card is not draw 4 - by UNO rules, the initial card cannot be a draw 4
+      while((await t.one(`
+        SELECT "value"
+          FROM game_cards
+          INNER JOIN cards USING(card_id)
+          WHERE
+            game_id = $1 AND
+            location = 'DECK' AND
+            "order" = (
+              SELECT MAX("order") FROM game_cards WHERE game_id = $1 AND location = 'DECK'
+            )`, [
+        this.id,
+      ])).value === "DRAW_FOUR") {
+        await this.shuffleDeck(t);
+      };
+      // Deal initial card onto discard from deck
       await t.none(`
         UPDATE game_cards
           SET
@@ -500,8 +507,6 @@ class Game {
    * Plays a card, using a chosen color if played card is a wildcard
    */
   async playCard(requestingUserId, cardId, chosenWildcardColor) {
-    let gameEnded = false;
-    let playedCard;
     await db.tx(async t => {
       // Check that game is in progress
       if (!await this.isGameInProgress(t)) {
@@ -549,20 +554,65 @@ class Game {
         this.id,
         cardId,
       ]);
-      // TODO: Card effects (draw 2, reverse, skip, draw four)
-
+      // Card effects (draw 2, reverse, skip, draw four)
+      const gamePlayers = await this.getGameUsers(t);
+      const nextPlayer = gamePlayers.find(user => user.play_order === 1);
+      let skipNextPlayer = false;
+      let reversePlayOrder = false;
+      let nextPlayerCardsToDraw = 0;
+      switch (cardToPlay.value) {
+        case "DRAW_TWO": {
+          // The next player draws two cards.
+          // If it is a 2 player game, the next player also has their turn skipped.
+          nextPlayerCardsToDraw = 2;
+          if (gamePlayers.length === 2) {
+            skipNextPlayer = true;
+          }
+          break;
+        }
+        case "DRAW_FOUR": {
+          // The next player draws four cards and their turn is skipped.
+          nextPlayerCardsToDraw = 4;
+          skipNextPlayer = true;
+          break;
+        }
+        case "SKIP": {
+          // The next player's turn is skipped.
+          skipNextPlayer = true;
+          break;
+        }
+        case "REVERSE": {
+          // Reverse the turn order, unless:
+          // If it is a 2 player game, the reverse card acts like a skip instead.
+          if (gamePlayers.length === 2) {
+            skipNextPlayer = true;
+          } else {
+            reversePlayOrder = true;
+          }
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+      if (nextPlayerCardsToDraw) {
+        for (let i = 0; i < nextPlayerCardsToDraw; i++) {
+          await this.dealCard(nextPlayer.user_id, t);
+        }
+      }
       // Check win condition
       // If the player only had 1 card before playing the card (meaning the player has 0 cards after playing), the player wins.
+      let gameEnded = false;
       if (currentTurnPlayerCards.length <= 1) {
-        await endGameWithWinner(t, currentTurnPlayer.user_id);
+        await this.endGameWithWinner(t, currentTurnPlayer.user_id);
         gameEnded = true;
       } else {
         // Update play order
-        const gamePlayers = await this.getGameUsers(t);
         await Promise.all(gamePlayers.map(gamePlayer => {
-          let newOrder = gamePlayer.play_order - 1;
+          // Calculate new play order, taking into account whether the turn order has been reversed or whether a player has been skipped.
+          let newOrder = ((reversePlayOrder ? gamePlayers.length - gamePlayer.play_order : gamePlayer.play_order) % gamePlayers.length) - (skipNextPlayer ? 2 : 1);
           if (newOrder < 0) {
-            newOrder = gamePlayers.length - 1;
+            newOrder = gamePlayers.length + newOrder;
           }
           return t.none(`UPDATE game_users SET play_order = $3 WHERE game_id = $1 AND user_id = $2`, [
             this.id,
@@ -574,13 +624,29 @@ class Game {
         await this.ensureCurrentPlayerCanPlayCard(t);
       }
 
-      playedCard = cardToPlay;
+      // Return results of turn for game event emitting
+      return {
+        turnUserId: requestingUserId,
+        playedCard: cardToPlay,
+        gameEnded: gameEnded,
+        nextPlayerSkipped: skipNextPlayer,
+        nextPlayer: nextPlayer,
+        playOrderReversed: reversePlayOrder,
+      };
+    }).then(turnResults => {
+      // Emit game events based on the result of the turn
+      this.emitGameEvent({ type: "CARD_PLAYED", user_id: turnResults.turnUserId, card_color: turnResults.playedCard.color, card_value: turnResults.playedCard.value });
+      if (turnResults.nextPlayerSkipped) {
+        this.emitGameEvent({ type: "SKIPPED_TURN", user_id: turnResults.nextPlayer.user_id });
+      }
+      if (turnResults.playOrderReversed) {
+        this.emitGameEvent({ type: "REVERSED_TURNS" });
+      }
+      if (turnResults.gameEnded) {
+        this.emitGameEvent({ type: "GAME_ENDED" });
+      }
+      this.emitGameStateToConnectedUsers();
     });
-    this.emitGameEvent({ type: "CARD_PLAYED", user_id: requestingUserId, card_color: playedCard.color, card_value: playedCard.value });
-    if (gameEnded) {
-      this.emitGameEvent({ type: "GAME_ENDED" });
-    }
-    this.emitGameStateToConnectedUsers();
   }
 
   /**
@@ -701,6 +767,14 @@ class Game {
    * 
    * DEALT_CARD - A card was dealt to a player.
    *    Additional keys: user_id
+   * 
+   * CARD_PLAYED - A card was played by a player.
+   *    Additional keys: user_id, card_color, card_value
+   * 
+   * SKIPPED_TURN - A player's turn was skipped.
+   *    Additional keys: user_id
+   * 
+   * REVERSED_TURNS - The turn order was reversed.
    * 
    * GAME_DELETED - All players left before game started.
    * 
