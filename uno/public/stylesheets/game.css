@@ -437,7 +437,7 @@ body {
 #leftOpponent,
 #rightOpponent {
     display: flex;
-    overflow: hidden;
+    /* overflow: hidden; */
     flex-direction: column;
     justify-content: center;
     border-radius: 1rem;
@@ -479,8 +479,20 @@ body {
 }
 
 #myHand {
+    display: flex;
+    z-index: 1;
+    width: 50%;
+    left: 50%;
+    margin-left: -25%;
+    height: 22vh;
+    bottom: 0px;
+    transform: translateY(5%);
+}
+
+#myHandBorder {
+    display: flex;
     overflow: hidden;
-    border: .2rem solid yellow;
+    /* border: .2rem solid yellow; */
     border-radius: 1rem;
     border-bottom-left-radius: 0%;
     border-bottom-right-radius: 0%;
@@ -501,7 +513,7 @@ body {
 #rightOpponent::before,
 #leftOpponent::before,
 #topOpponent::before,
-#myHand::before {
+#myHandBorder::before {
     content: "";
     position: absolute;
     z-index: -2;
@@ -514,7 +526,7 @@ body {
 }
 
 #topOpponent::before,
-#myHand::before {
+#myHandBorder::before {
     left: -50%;
     top: -450%;
     width: 200%;
@@ -531,8 +543,7 @@ body {
 
 #rightOpponent::after,
 #leftOpponent::after,
-#topOpponent::after,
-#myHand::after {
+#topOpponent::after {
     content: '';
     position: absolute;
     z-index: -1;
@@ -540,7 +551,19 @@ body {
     top: 4px;
     width: calc(100% - 10px);
     height: calc(100% - 9px);
-    border-radius: 5px;
+    border-radius: 10px;
+
+}
+
+#myHandBorder::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    left: 6px;
+    top: 4px;
+    width: calc(100% - 10px);
+    height: calc(100% - 11px);
+    border-radius: 10px;
 
 }
 
@@ -554,7 +577,7 @@ body {
     visibility: var(--topOpponentBorder);
 }
 
-#myHand::before {
+#myHandBorder::before {
     visibility: var(--myHandBorder);
 }
 #rightOpponent::after {
@@ -572,7 +595,7 @@ body {
     background: radial-gradient(ellipse at bottom, #406a4b, #2f4e37);
 }
 
-#myHand::after {
+#myHandBorder::after {
     visibility: var(--myHandBorder);
     background: radial-gradient(ellipse at top, #406a4b, #2f4e37);
 }

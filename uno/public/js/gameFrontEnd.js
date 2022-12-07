@@ -66,10 +66,11 @@ function createContainer(username, message) {
 
 let gameStarted = false;
 
-let opponentMap = new Map();
+let playerMap = new Map();
 
 
 const gameLocations = {
+    root: document.querySelector(':root'),
     discard: document.getElementById("discard"),
     myHand: document.getElementById("myHand"),
     leftOpponent: document.getElementById("leftOpponent"),
@@ -103,19 +104,25 @@ socket.on("game_state", (gameState) => {
     }).sort((a, b) => a.play_order - b.play_order);
 
     for (const opponent of currentOpponents) {
-        if (opponentMap.get(opponent.user_id) === undefined) {
-            if (!Array.from(opponentMap.values()).includes("leftOpponent")) {
-                opponentMap.set(opponent.user_id, "leftOpponent");
+        if (playerMap.get(opponent.user_id) === undefined) {
+            if (!Array.from(playerMap.values()).includes("leftOpponent")) {
+                playerMap.set(opponent.user_id, "leftOpponent");
                 showOpponent("leftOpponent", opponent.username);
-            } else if (!Array.from(opponentMap.values()).includes("topOpponent")) {
-                opponentMap.set(opponent.user_id, "topOpponent");
+            } else if (!Array.from(playerMap.values()).includes("topOpponent")) {
+                playerMap.set(opponent.user_id, "topOpponent");
                 showOpponent("topOpponent", opponent.username);
-            } else if (!Array.from(opponentMap.values()).includes("rightOpponent")) {
-                opponentMap.set(opponent.user_id, "rightOpponent");
+            } else if (!Array.from(playerMap.values()).includes("rightOpponent")) {
+                playerMap.set(opponent.user_id, "rightOpponent");
                 showOpponent("rightOpponent", opponent.username);
             }
         }
     }
+    playerMap.set(currentUser.user_id, "myHand");
+
+
+    const currentPlayers = gameState?.users.sort((a, b) => a.play_order - b.play_order);
+
+    changeTurnBorder(currentPlayers[0].user_id, currentPlayers[currentPlayers.length-1].user_id);
 
     clearBoard();
 
@@ -123,15 +130,17 @@ socket.on("game_state", (gameState) => {
         return card.user_id === currentUser.user_id;
     }).sort((a, b) => a.order - b.order);
     let numCards = 0;
-    let root = document.querySelector(':root');
     for (const card of currentUserCards) {
         dealCard(card)
         numCards++;
     }
-    root.style.setProperty('--numCards', numCards);
+    gameLocations.root.style.setProperty('--numCards', numCards);
     numCards = 0;
 
-    for (const [key, value] of opponentMap) {
+    for (const [key, value] of playerMap) {
+        if (key === currentUser.user_id){
+            break;
+        }
         const currentOpponentCards = gameState?.cards.filter(card => {
             return card.user_id === key;
         });
@@ -139,7 +148,7 @@ socket.on("game_state", (gameState) => {
             dealOpponentCard(value);
             numCards++;
         }
-        root.style.setProperty('--' + value + 'Cards', numCards);
+        gameLocations.root.style.setProperty('--' + value + 'Cards', numCards);
         numCards = 0;
     }
 
@@ -148,8 +157,6 @@ socket.on("game_state", (gameState) => {
     }).sort((a, b) => a.order - b.order);
 
     discardPileCard(discardPile);
-
-
 
 });
 
@@ -383,4 +390,11 @@ function discardPileCard(discardPile) {
         iterations: 1
     })
     lastCard.style.transform = 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + '))'
+}
+
+function changeTurnBorder(isTurn, wasTurn) {
+    gameLocations[playerMap.get(isTurn)].style.border = "0rem"
+    gameLocations[playerMap.get(wasTurn)].style.border = ".2rem solid yellow"
+    gameLocations.root.style.setProperty('--' + playerMap.get(isTurn) + 'Border', "visible");
+    gameLocations.root.style.setProperty('--' + playerMap.get(wasTurn) + 'Border', "hidden");
 }
