@@ -58,6 +58,25 @@ script(src='/socket.io/socket.io.js')
                 button#yellowbttn.choosebttn YELLOW
                 button#greenbttn.choosebttn GREEN
 
+    a.winner-open(href='#winner')
+    #winner.winner
+        .winner-content
+            a.winner-close(href='#w' title='Close Winner') X
+            h1 
+            .winner-area
+                p you won
+
+    a.winner-open(href='#loser')
+    #winner.winner
+        .winner-content
+            a.winner-close(href='#l' title='Close Loser') X
+            h1 
+            .winner-area
+                p you lost
+                    
+
+    
+
 
 
 
