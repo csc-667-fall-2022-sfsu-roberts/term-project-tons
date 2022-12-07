@@ -174,7 +174,7 @@ body {
 }
 
 .deck,
-.discard {
+#discard {
     border: .2rem solid yellow;
     border-radius: 1rem;
     color: yellow;
@@ -402,7 +402,7 @@ body {
 .topOpponentContainer{
     position: fixed;
     left: 50%;
-    margin-left: -15%;
+    transform: translateX(-50%);
     width: 60vh;
     height: 21vh;
     top: 0px;
@@ -418,7 +418,7 @@ body {
 #topOpponentName {
     top: 0px;
     transform: translateX(-105%);
-} */
+}
 
 #leftOpponentName,
 #rightOpponentName,
@@ -449,6 +449,7 @@ body {
     display: flex;
     flex-direction: row;
     justify-content: center;
+    align-items: center;
     border: .2rem solid yellow;
     border-top: 0px;
     border-radius: 1rem;
@@ -469,7 +470,7 @@ body {
     background-size: contain;
     padding: 2rem;
     max-width: 388px;
-    max-height: 562px;
+    max-height: 563px;
     width: 12.93vh;
     height: 18.73vh;
     border-radius: .5rem;
@@ -511,7 +512,7 @@ body {
 }
 
 .topOpponentCard {
-    margin-top: 10px;
+    margin-top: 5px;
     transform: rotate(180deg);
 }
 
@@ -554,10 +555,10 @@ body {
 }
 
 .rightOpponentCard:not(:first-child){
-    margin-top: calc(var(--rightOpponentCards)*-2vh);
+    margin-top: calc((var(--rightOpponentCards)*-10px) + -5vh);
 }
 .leftOpponentCard:not(:first-child) {
-    margin-top: calc(var(--leftOpponentCards)*-2vh);
+    margin-top: calc((var(--leftOpponentCards)*-10px) + -5vh);
 }
 
 .topOpponentCard:not(:last-child) {

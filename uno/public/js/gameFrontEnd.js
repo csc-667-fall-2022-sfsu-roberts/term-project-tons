@@ -69,7 +69,9 @@ let gameStarted = false;
 let opponentMap = new Map();
 
 
-const opponentLocations = {
+const gameLocations = {
+    discard: document.getElementById("discard"),
+    myHand: document.getElementById("myHand"),
     leftOpponent: document.getElementById("leftOpponent"),
     topOpponent: document.getElementById("topOpponent"),
     rightOpponent: document.getElementById("rightOpponent"),
@@ -100,27 +102,22 @@ socket.on("game_state", (gameState) => {
         return opponent.user_id !== currentUser.user_id;
     }).sort((a, b) => a.play_order - b.play_order);
 
-    for (const opponent of currentOpponents){
-        if(opponentMap.get(opponent.user_id) === undefined){
-            if (!Array.from(opponentMap.values()).includes("leftOpponent")){
-                opponentMap.set(opponent.user_id,"leftOpponent");
+    for (const opponent of currentOpponents) {
+        if (opponentMap.get(opponent.user_id) === undefined) {
+            if (!Array.from(opponentMap.values()).includes("leftOpponent")) {
+                opponentMap.set(opponent.user_id, "leftOpponent");
                 showOpponent("leftOpponent", opponent.username);
-            } else if (!Array.from(opponentMap.values()).includes("topOpponent")){
-                opponentMap.set(opponent.user_id,"topOpponent");
+            } else if (!Array.from(opponentMap.values()).includes("topOpponent")) {
+                opponentMap.set(opponent.user_id, "topOpponent");
                 showOpponent("topOpponent", opponent.username);
-            } else if (!Array.from(opponentMap.values()).includes("rightOpponent")){
-                opponentMap.set(opponent.user_id,"rightOpponent");
+            } else if (!Array.from(opponentMap.values()).includes("rightOpponent")) {
+                opponentMap.set(opponent.user_id, "rightOpponent");
                 showOpponent("rightOpponent", opponent.username);
             }
         }
     }
 
-
-    const deleteAssets = document.getElementById("myHand")
-
-    while (deleteAssets.firstChild) {
-        deleteAssets.removeChild(deleteAssets.firstChild);
-    }
+    clearBoard();
 
     const currentUserCards = gameState?.cards.filter(card => {
         return card.user_id === currentUser.user_id;
@@ -134,15 +131,15 @@ socket.on("game_state", (gameState) => {
     root.style.setProperty('--numCards', numCards);
     numCards = 0;
 
-    for (const [key, value] of opponentMap){
+    for (const [key, value] of opponentMap) {
         const currentOpponentCards = gameState?.cards.filter(card => {
             return card.user_id === key;
         });
-        for (const card of currentOpponentCards){
+        for (const card of currentOpponentCards) {
             dealOpponentCard(value);
             numCards++;
         }
-        root.style.setProperty('--'+value+'Cards', numCards);
+        root.style.setProperty('--' + value + 'Cards', numCards);
         numCards = 0;
     }
 
@@ -191,11 +188,27 @@ socket.on('game_event', (gameEvent) => {
     }
 })
 
-//TODO
-//direction of play matters
+function clearBoard(){
+    while (gameLocations.myHand.firstChild) {
+        gameLocations.myHand.removeChild(gameLocations.myHand.firstChild);
+    }
+    while (gameLocations.leftOpponent.firstChild) {
+        gameLocations.leftOpponent.removeChild(gameLocations.leftOpponent.firstChild);
+    }
+    while (gameLocations.rightOpponent.firstChild) {
+        gameLocations.rightOpponent.removeChild(gameLocations.rightOpponent.firstChild);
+    }
+    while (gameLocations.topOpponent.firstChild) {
+        gameLocations.topOpponent.removeChild(gameLocations.topOpponent.firstChild);
+    }
+    while (gameLocations.discard.lastChild && gameLocations.discard.lastChild.innerHTML !== "Discard Pile") {
+        gameLocations.discard.removeChild(gameLocations.discard.lastChild);
+    }
+}
+
 function showOpponent(key, username) {
-    opponentLocations[key].style.visibility = "visible";
-    const opName = document.getElementById(opponentLocations[key].id + "Name");
+    gameLocations[key].style.visibility = "visible";
+    const opName = document.getElementById(gameLocations[key].id + "Name");
     opName.style.visibility = "visible";
     opName.innerHTML = username;
 }
@@ -275,7 +288,7 @@ function dealCard(card) {
 function dealOpponentCard(opponentPosition) {
     let newCard = document.createElement('div');
     newCard.classList.add('card', opponentPosition + 'Card');
-    opponentLocations[opponentPosition].appendChild(newCard);
+    gameLocations[opponentPosition].appendChild(newCard);
 }
 
 
@@ -349,20 +362,19 @@ function wildcard(card) {
 
 
 function discardPileCard(discardPile) {
-    if(gameStarted === false) {
+    if (gameStarted === false) {
         return;
     }
     let degreeTracker = 0;
     for (const card of discardPile) {
-        let elem = document.getElementsByClassName("discard").item(0);
         let newCard = document.createElement("div");
-        elem.appendChild(newCard);
+        gameLocations.discard.appendChild(newCard);
         newCard.classList.add("card", "discardCard");
         newCard.style.backgroundImage = "url(" + CARD_FILE[card.color][card.value] + ")";
         newCard.style.transform = 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + '))'
         degreeTracker++;
     }
-    let lastCard = document.getElementsByClassName("discard").item(0).lastChild;
+    let lastCard = gameLocations.discard.lastChild;
     lastCard.animate([
         { transform: 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + ')) scale(1.5)' },
         { transform: 'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + ')) scale(1)' }
