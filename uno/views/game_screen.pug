@@ -62,17 +62,30 @@ script(src='/socket.io/socket.io.js')
     #winner.winner
         .winner-content
             a.winner-close(href='#w' title='Close Winner') X
-            h1 
-            .winner-area
-                p you won
-
-    a.winner-open(href='#loser')
-    #winner.winner
-        .winner-content
-            a.winner-close(href='#l' title='Close Loser') X
-            h1 
-            .winner-area
-                p you lost
+            h1 GAME OVER
+            .winner-area 
+                img(src='/assets/winnerSmiley.png')
+                br
+                | Congratulations!
+                br
+                | YOU WIN
+                br
+                button.lobby-button Return to Lobby              
+    a.loser-open(href='#loser')
+    #loser.loser
+        .loser-content
+            a.loser-close(href='#l' title='Close Loser') X
+            h1 GAME OVER
+            .loser-area 
+                img(src='/assets/loserSmiley.png')
+                br
+                | Oh no!
+                br
+                | YOU LOST
+                br
+                button.lobby-button Return to Lobby
+    
+  
                     
 
     

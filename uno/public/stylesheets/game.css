@@ -680,3 +680,23 @@ button.accordion:hover, button.accordion.is-open {
     }
 
 /* END CHAT */
+
+
+.lobby-button {
+    background-color: #49c449;
+    width: 200px;
+    height: 50px;
+    font-size: 20px;
+    border: solid;
+    border-color: white;
+    border-radius: 5px;
+}
+.lobby-button:hover {
+    background-color: #0c870c;
+  }
+
+.lobby-button:active {
+    background-color: #0c870c;
+    transform: translateY(4px);
+  }
+

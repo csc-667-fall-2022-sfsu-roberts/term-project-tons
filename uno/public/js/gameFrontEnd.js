@@ -149,12 +149,12 @@ socket.on('game_state', (gameState) => {
       return users.user_id === currentUser.user_id;
     });
     for (const user of winOrLose) {
-      // console.log(user.state);
-      if(user.state === "WON"){
-        console.log("YOU WON")
+      console.log(user.state);
+      if (user.state === 'WON') {
+        window.location.href = '#winner';
       }
-      if(user.state === "LOST"){
-        console.log("YOU LOST")
+      if (user.state === 'LOST') {
+        window.location.href = '#loser';
       }
     }
   }
@@ -417,3 +417,9 @@ function discardPileCard(discardPile) {
   lastCard.style.transform =
     'rotate(calc(' + discardPileDegree[degreeTracker] + 'deg' + '))';
 }
+
+//Button on end game screen return to lobby
+const returnLobby = document.querySelectorAll('.lobby-button');
+returnLobby.forEach(el => el.addEventListener('click', event => {
+  window.location.href = '/lobby'
+}));
