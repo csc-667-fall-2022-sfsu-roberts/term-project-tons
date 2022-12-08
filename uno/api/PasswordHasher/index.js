@@ -1,5 +1,5 @@
 const bcrypt = require("bcrypt");
-const { Blob } = require("buffer");
+// const { Blob } = require("buffer");
 const ApiClientError = require("../../errors/ApiClientError");
 
 class PasswordHasher {
@@ -9,11 +9,11 @@ class PasswordHasher {
   }
 
   hash(password) {
-    if (new Blob([password]).size > this.maxPasswordByteSize) {
-      throw new ApiClientError(`Password cannot be more than ${this.maxPasswordByteSize} bytes in size.`);
-    } else {
+    // if (new Blob([password]).size > this.maxPasswordByteSize) {
+    //   throw new ApiClientError(`Password cannot be more than ${this.maxPasswordByteSize} bytes in size.`);
+    // } else {
       return bcrypt.hash(password, this.saltRounds);
-    }
+    // }
   }
 
   verify(password, hash) {
